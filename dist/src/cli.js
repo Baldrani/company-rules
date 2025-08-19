@@ -193,20 +193,10 @@ program
         margin: 1
     }));
     if (fs.existsSync('./instructions.yml')) {
-        const { overwrite } = await inquirer_1.default.prompt([
-            {
-                type: 'confirm',
-                name: 'overwrite',
-                message: 'instructions.yml already exists. Overwrite it?',
-                default: false
-            }
-        ]);
-        if (!overwrite) {
-            console.log(chalk_1.default.yellow('📝 Edit the existing file to customize your project rules'));
-            console.log(chalk_1.default.gray('💡 Or check out'), chalk_1.default.cyan('examples/instructions.yml'), chalk_1.default.gray('for inspiration'));
-            console.log(chalk_1.default.cyan('🚀 Then run:'), chalk_1.default.white.bold('npx instructor install --interactive'));
-            return;
-        }
+        console.log(chalk_1.default.yellow('📝 instructions.yml already exists and will not be overwritten'));
+        console.log(chalk_1.default.gray('💡 Check out'), chalk_1.default.cyan('examples/instructions.yml'), chalk_1.default.gray('for more rule ideas'));
+        console.log(chalk_1.default.cyan('🚀 Run:'), chalk_1.default.white.bold('npx instructor install --interactive'), chalk_1.default.gray('to configure your setup'));
+        return;
     }
     let config;
     if (options.interactive) {
@@ -429,7 +419,7 @@ program
 // Clean command
 program
     .command('clean')
-    .description('Remove generated configuration files')
+    .description('Remove generated configuration files (preserves instructions.yml)')
     .option('--confirm', 'Skip confirmation prompt')
     .action(async (options) => {
     console.log((0, boxen_1.default)(chalk_1.default.bold.red('🗑️  Clean Generated Files'), {
@@ -492,7 +482,7 @@ program
 program
     .command('reset')
     .alias('clean')
-    .description('Reset project to clean state by removing all generated files and configurations')
+    .description('Reset project to clean state by removing all generated files (preserves instructions.yml)')
     .option('--confirm', 'Skip confirmation prompt')
     .action(async (options) => {
     console.log((0, boxen_1.default)(chalk_1.default.bold.red('🔄 Reset Project to Clean State'), {
@@ -502,7 +492,6 @@ program
         margin: 1
     }));
     const filesToReset = [
-        'instructions.yml',
         'CLAUDE.md',
         'copilot-instructions.md',
         '.vscode/settings.json',
@@ -514,7 +503,8 @@ program
         console.log(chalk_1.default.yellow('ℹ️  Project is already in clean state - no generated files found'));
         return;
     }
-    console.log('The following files and directories will be removed:');
+    console.log('The following generated files and directories will be removed:');
+    console.log(chalk_1.default.gray('   ℹ️  instructions.yml will be preserved'));
     existingFiles.forEach(file => {
         console.log(chalk_1.default.red('   ✗'), file);
     });
@@ -524,7 +514,7 @@ program
             {
                 type: 'confirm',
                 name: 'confirm',
-                message: 'Are you sure you want to reset the project? This will remove all configuration files.',
+                message: 'Are you sure you want to reset the project? This will remove all generated configuration files (instructions.yml will be preserved).',
                 default: false
             }
         ]);

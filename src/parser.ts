@@ -5,8 +5,6 @@ export interface Instruction {
 }
 
 export interface ParsedInstructions {
-  ides: string[];
-  agents: string[];
   instructions: Instruction[];
 }
 
@@ -17,8 +15,6 @@ export interface ValidationResult {
 }
 
 export interface ConfigSchema {
-  ides?: string[];
-  agents?: string[];
   instructions?: (string | InstructionSchema)[];
 }
 
@@ -37,13 +33,9 @@ export class InstructionParser {
       throw new Error(`Configuration validation failed:\n${validation.errors.join('\n')}`);
     }
 
-    const ides = this.config.ides || [];
-    const agents = this.config.agents || [];
     const instructions = this.parseInstructions(this.config.instructions || []);
 
     return {
-      ides,
-      agents,
       instructions
     };
   }
@@ -60,12 +52,6 @@ export class InstructionParser {
 
     // Check root structure
     this.validateRootStructure(errors, warnings);
-    
-    // Validate IDEs
-    this.validateIDEs(errors, warnings);
-    
-    // Validate agents
-    this.validateAgents(errors, warnings);
     
     // Validate instructions
     this.validateInstructions(errors, warnings);
@@ -85,94 +71,17 @@ export class InstructionParser {
       return;
     }
 
-    const validKeys = ['ides', 'agents', 'instructions'];
+    const validKeys = ['instructions'];
     const extraKeys = Object.keys(this.config).filter(key => !validKeys.includes(key));
     if (extraKeys.length > 0) {
       warnings.push(`Unknown configuration keys will be ignored: ${extraKeys.join(', ')}`);
     }
 
-    if (!this.config.ides && !this.config.agents) {
-      warnings.push('No IDEs or agents configured - configuration will have no effect');
+    if (!this.config.instructions) {
+      warnings.push('No instructions defined');
     }
   }
 
-  private validateIDEs(errors: string[], warnings: string[]): void {
-    if (this.config.ides === undefined) {
-      return; // Optional field
-    }
-
-    if (!Array.isArray(this.config.ides)) {
-      errors.push('ides must be an array');
-      return;
-    }
-
-    if (this.config.ides.length === 0) {
-      warnings.push('No IDEs configured');
-      return;
-    }
-
-    const supportedIDEs = ['cursor', 'vscode', 'phpstorm', 'webstorm'];
-    const duplicates = this.findDuplicates(this.config.ides.map((ide: any) => String(ide).toLowerCase()));
-    
-    if (duplicates.length > 0) {
-      warnings.push(`Duplicate IDEs: ${duplicates.join(', ')}`);
-    }
-
-    this.config.ides.forEach((ide: any, index: number) => {
-      if (typeof ide !== 'string') {
-        errors.push(`IDE ${index + 1} must be a string, got ${typeof ide}`);
-        return;
-      }
-
-      if (ide.trim() === '') {
-        errors.push(`IDE ${index + 1} is empty`);
-        return;
-      }
-
-      if (!supportedIDEs.includes(ide.toLowerCase())) {
-        warnings.push(`Unsupported IDE '${ide}' will be ignored`);
-      }
-    });
-  }
-
-  private validateAgents(errors: string[], warnings: string[]): void {
-    if (this.config.agents === undefined) {
-      return; // Optional field
-    }
-
-    if (!Array.isArray(this.config.agents)) {
-      errors.push('agents must be an array');
-      return;
-    }
-
-    if (this.config.agents.length === 0) {
-      warnings.push('No agents configured');
-      return;
-    }
-
-    const supportedAgents = ['claude', 'copilot', 'codeium'];
-    const duplicates = this.findDuplicates(this.config.agents.map((agent: any) => String(agent).toLowerCase()));
-    
-    if (duplicates.length > 0) {
-      warnings.push(`Duplicate agents: ${duplicates.join(', ')}`);
-    }
-
-    this.config.agents.forEach((agent: any, index: number) => {
-      if (typeof agent !== 'string') {
-        errors.push(`Agent ${index + 1} must be a string, got ${typeof agent}`);
-        return;
-      }
-
-      if (agent.trim() === '') {
-        errors.push(`Agent ${index + 1} is empty`);
-        return;
-      }
-
-      if (!supportedAgents.includes(agent.toLowerCase())) {
-        warnings.push(`Unsupported agent '${agent}' will be ignored`);
-      }
-    });
-  }
 
   private validateInstructions(errors: string[], warnings: string[]): void {
     if (!this.config.instructions) {

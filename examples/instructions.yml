@@ -1,6 +1,6 @@
 # Example instructions.yml - Company Rules Package
-# This file shows various types of rules you can define for your development team
-# The CLI will ask you which IDEs and agents to configure when you run 'instructor install'
+# This file contains ONLY the coding rules/instructions for your development team
+# IDEs and agents are selected at runtime when you run 'instructor install --interactive'
 
 instructions:
   # Code formatting and style rules

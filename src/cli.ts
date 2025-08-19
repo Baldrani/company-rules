@@ -9,7 +9,7 @@ import inquirer from 'inquirer';
 import ora from 'ora';
 import boxen from 'boxen';
 import { InstructionParser } from './parser';
-import { FileGenerator } from './generator';
+import { FileGenerator, GeneratorInstructions } from './generator';
 import { LLMService } from './llm-service';
 import { SUPPORTED_IDES, SUPPORTED_AGENTS, DEFAULT_SELECTED_IDES, DEFAULT_SELECTED_AGENTS } from './constants';
 
@@ -59,17 +59,19 @@ program
       const config = yaml.parse(yamlContent);
       
       const parser = new InstructionParser(config);
-      let instructions = parser.parse();
+      const parsedInstructions = parser.parse();
       
-      parseSpinner.succeed(chalk.green(`Parsed ${instructions.instructions.length} instructions for ${instructions.ides.length} IDEs and ${instructions.agents.length} agents`));
+      parseSpinner.succeed(chalk.green(`Parsed ${parsedInstructions.instructions.length} instructions`));
       
       if (options.verbose) {
-        console.log(chalk.gray('IDEs:'), instructions.ides.join(', '));
-        console.log(chalk.gray('Agents:'), instructions.agents.join(', '));
-        console.log(chalk.gray('Instructions:'), instructions.instructions.map(i => i.name).join(', '));
+        console.log(chalk.gray('Instructions:'), parsedInstructions.instructions.map(i => i.name).join(', '));
       }
 
-      // Interactive mode: let user choose what to actually use
+      // Always ask user to choose IDEs and agents (either interactive or use defaults)
+      let selectedIdes: string[];
+      let selectedAgents: string[];
+      let selectedInstructions = parsedInstructions.instructions;
+
       if (options.interactive) {
         console.log(chalk.cyan('\n🎯 Let\'s customize your installation:\n'));
         
@@ -81,7 +83,7 @@ program
             choices: SUPPORTED_IDES.map(ide => ({
               name: `${ide.name} - ${ide.description}`,
               value: ide.value,
-              checked: instructions.ides.includes(ide.value) || DEFAULT_SELECTED_IDES.includes(ide.value)
+              checked: DEFAULT_SELECTED_IDES.includes(ide.value)
             }))
           },
           {
@@ -91,33 +93,42 @@ program
             choices: SUPPORTED_AGENTS.map(agent => ({
               name: `${agent.name} - ${agent.description}`,
               value: agent.value,
-              checked: instructions.agents.includes(agent.value) || DEFAULT_SELECTED_AGENTS.includes(agent.value)
+              checked: DEFAULT_SELECTED_AGENTS.includes(agent.value)
             }))
           },
           {
             type: 'checkbox',
             name: 'selectedInstructions',
             message: 'Which instructions would you like to include?',
-            choices: instructions.instructions.map(instruction => ({
+            choices: parsedInstructions.instructions.map(instruction => ({
               name: instruction.name,
               value: instruction.name,
               checked: true
             })),
-            when: instructions.instructions.length > 0
+            when: parsedInstructions.instructions.length > 0
           }
         ]);
 
-        // Filter instructions based on user selection
-        instructions = {
-          ides: choices.selectedIdes || instructions.ides,
-          agents: choices.selectedAgents || instructions.agents,
-          instructions: instructions.instructions.filter(instruction => 
-            choices.selectedInstructions?.includes(instruction.name) ?? true
-          )
-        };
-
-        console.log(chalk.green(`\n✅ Selected: ${instructions.ides.length} IDEs, ${instructions.agents.length} agents, ${instructions.instructions.length} instructions\n`));
+        selectedIdes = choices.selectedIdes || DEFAULT_SELECTED_IDES;
+        selectedAgents = choices.selectedAgents || DEFAULT_SELECTED_AGENTS;
+        selectedInstructions = parsedInstructions.instructions.filter(instruction => 
+          choices.selectedInstructions?.includes(instruction.name) ?? true
+        );
+      } else {
+        // Use defaults when not in interactive mode
+        selectedIdes = DEFAULT_SELECTED_IDES;
+        selectedAgents = DEFAULT_SELECTED_AGENTS;
+        selectedInstructions = parsedInstructions.instructions;
       }
+
+      // Create the instructions object for the generator
+      const instructions: GeneratorInstructions = {
+        ides: selectedIdes,
+        agents: selectedAgents,
+        instructions: selectedInstructions
+      };
+
+      console.log(chalk.green(`\n✅ Configuration: ${instructions.ides.length} IDEs, ${instructions.agents.length} agents, ${instructions.instructions.length} instructions\n`));
       
       // Check LLM availability
       const llmService = LLMService.fromEnvironment();
@@ -205,26 +216,6 @@ program
       const answers = await inquirer.prompt([
         {
           type: 'checkbox',
-          name: 'ides',
-          message: 'Which IDEs do you use?',
-          choices: SUPPORTED_IDES.map(ide => ({
-            name: `${ide.name} - ${ide.description}`,
-            value: ide.value
-          })),
-          default: DEFAULT_SELECTED_IDES
-        },
-        {
-          type: 'checkbox',
-          name: 'agents',
-          message: 'Which AI coding assistants do you use?',
-          choices: SUPPORTED_AGENTS.map(agent => ({
-            name: `${agent.name} - ${agent.description}`,
-            value: agent.value
-          })),
-          default: DEFAULT_SELECTED_AGENTS
-        },
-        {
-          type: 'checkbox',
           name: 'frameworks',
           message: 'What frameworks/technologies does your project use?',
           choices: [
@@ -243,10 +234,8 @@ program
         }
       ]);
 
-      // Build config based on answers
+      // Build config based on answers (instructions only)
       config = {
-        ides: answers.ides,
-        agents: answers.agents,
         instructions: [] as any[]
       };
 
@@ -278,10 +267,8 @@ program
       }
 
     } else {
-      // Default configuration
+      // Default configuration (instructions only)
       config = {
-        ides: DEFAULT_SELECTED_IDES,
-        agents: DEFAULT_SELECTED_AGENTS,
         instructions: [
           { name: 'use tabs instead of spaces', files: '*.{ts,tsx,js,jsx}' },
           { name: 'minimize use of ai generated comments' },
@@ -298,11 +285,7 @@ program
     
     console.log(chalk.green.bold('\n✅ Created instructions.yml'));
     console.log(chalk.gray('📁 Location:'), path.resolve('./instructions.yml'));
-    console.log(chalk.gray('🎯 Configured for:'), 
-      config.ides.length > 0 ? config.ides.join(', ') : 'no IDEs',
-      'and',
-      config.agents.length > 0 ? config.agents.join(', ') : 'no agents'
-    );
+    console.log(chalk.gray('📋 Rules defined:'), `${config.instructions.length} coding rules`);
     
     console.log(boxen(
       chalk.green('Next steps:') + '\n\n' +
@@ -356,14 +339,13 @@ program
       console.log(chalk.gray('📁 Location:'), configPath);
       console.log('');
 
-      // Show IDEs
-      console.log(chalk.bold('🖥️  IDEs configured:'), instructions.ides.length > 0 ? instructions.ides.join(', ') : chalk.gray('none'));
-      
-      // Show agents
-      console.log(chalk.bold('🤖 Agents configured:'), instructions.agents.length > 0 ? instructions.agents.join(', ') : chalk.gray('none'));
-      
       // Show instructions count
       console.log(chalk.bold('📋 Instructions:'), `${instructions.instructions.length} rules defined`);
+      console.log(chalk.gray('💡 IDEs and agents are selected at runtime'));
+      
+      if (instructions.instructions.length > 0) {
+        console.log(chalk.gray('🔧 Available rules:'), instructions.instructions.slice(0, 5).map(i => i.name).join(', ') + (instructions.instructions.length > 5 ? '...' : ''));
+      }
 
       // Show validation warnings
       if (validation.warnings.length > 0) {
@@ -374,27 +356,28 @@ program
         });
       }
 
-      // Check generated files
+      // Check for any existing generated files
       console.log('');
-      console.log(chalk.bold('📄 Generated files:'));
-      const files = [
-        { name: 'CLAUDE.md', condition: instructions.agents.includes('claude') },
-        { name: 'copilot-instructions.md', condition: instructions.agents.includes('copilot') },
-        { name: '.vscode/settings.json', condition: instructions.ides.includes('vscode') },
-        { name: 'cursor/rules/*', condition: instructions.ides.includes('cursor') }
+      console.log(chalk.bold('📄 Existing generated files:'));
+      const possibleFiles = [
+        'CLAUDE.md',
+        'copilot-instructions.md',
+        '.vscode/settings.json',
+        'cursor/rules'
       ];
 
-      files.forEach(file => {
-        if (file.condition) {
-          const exists = file.name.includes('*') ? fs.existsSync('./cursor/rules') : fs.existsSync(file.name);
-          console.log(exists ? chalk.green('   ✓') : chalk.red('   ✗'), file.name);
-        }
-      });
-
-      if (files.some(file => file.condition && !fs.existsSync(file.name.replace('/*', '')))) {
-        console.log('');
-        console.log(chalk.cyan('💡 Run'), chalk.white.bold('instructor install'), chalk.cyan('to generate missing files'));
+      const existingFiles = possibleFiles.filter(file => fs.existsSync(file));
+      
+      if (existingFiles.length > 0) {
+        existingFiles.forEach(file => {
+          console.log(chalk.green('   ✓'), file);
+        });
+      } else {
+        console.log(chalk.gray('   (none found)'));
       }
+
+      console.log('');
+      console.log(chalk.cyan('💡 Run'), chalk.white.bold('instructor install --interactive'), chalk.cyan('to generate configuration files'));
 
     } catch (error) {
       console.log(chalk.red('❌ Error reading configuration:'), error instanceof Error ? error.message : error);
@@ -691,17 +674,24 @@ program
       const config = yaml.parse(yamlContent);
       
       const parser = new InstructionParser(config);
-      const instructions = parser.parse();
+      const parsedInstructions = parser.parse();
+      
+      // Use defaults for preview since IDEs/agents are runtime choices
+      const previewInstructions: GeneratorInstructions = {
+        ides: DEFAULT_SELECTED_IDES,
+        agents: DEFAULT_SELECTED_AGENTS,
+        instructions: parsedInstructions.instructions
+      };
       
       const configDir = path.dirname(configPath);
       const generator = new FileGenerator(configDir);
-      const previewItems = await generator.preview(instructions);
+      const previewItems = await generator.preview(previewInstructions);
       
       spinner.succeed(chalk.green('Preview generated successfully!'));
 
       console.log(chalk.bold.green(`\n📋 Would generate ${previewItems.length} items:`));
-      console.log(chalk.gray('IDEs:'), instructions.ides.length > 0 ? instructions.ides.join(', ') : chalk.gray('none'));
-      console.log(chalk.gray('Agents:'), instructions.agents.length > 0 ? instructions.agents.join(', ') : chalk.gray('none'));
+      console.log(chalk.gray('Preview using defaults:'), DEFAULT_SELECTED_IDES.join(', '), 'and', DEFAULT_SELECTED_AGENTS.join(', '));
+      console.log(chalk.gray('Instructions:'), `${parsedInstructions.instructions.length} rules`);
       console.log('');
 
       // Group by type

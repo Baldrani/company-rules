@@ -4,8 +4,6 @@ export interface Instruction {
     files?: string;
 }
 export interface ParsedInstructions {
-    ides: string[];
-    agents: string[];
     instructions: Instruction[];
 }
 export interface ValidationResult {
@@ -14,8 +12,6 @@ export interface ValidationResult {
     warnings: string[];
 }
 export interface ConfigSchema {
-    ides?: string[];
-    agents?: string[];
     instructions?: (string | InstructionSchema)[];
 }
 export interface InstructionSchema {
@@ -29,8 +25,6 @@ export declare class InstructionParser {
     parse(): ParsedInstructions;
     validate(): ValidationResult;
     private validateRootStructure;
-    private validateIDEs;
-    private validateAgents;
     private validateInstructions;
     private validateInstructionName;
     private validateFilePatterns;

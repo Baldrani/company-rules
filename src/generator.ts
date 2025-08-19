@@ -1,7 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ParsedInstructions, Instruction } from './parser';
+import { Instruction } from './parser';
 import { LLMService } from './llm-service';
+
+export interface GeneratorInstructions {
+  ides: string[];
+  agents: string[];
+  instructions: Instruction[];
+}
 
 export interface PreviewItem {
   path: string;
@@ -19,7 +25,7 @@ export class FileGenerator {
     this.basePath = basePath;
   }
 
-  async generate(instructions: ParsedInstructions): Promise<void> {
+  async generate(instructions: GeneratorInstructions): Promise<void> {
     // Generate IDE-specific configurations
     for (const ide of instructions.ides) {
       await this.generateIDEConfig(ide, instructions.instructions);
@@ -34,7 +40,7 @@ export class FileGenerator {
     await this.updateGitignore(instructions);
   }
 
-  async preview(instructions: ParsedInstructions): Promise<PreviewItem[]> {
+  async preview(instructions: GeneratorInstructions): Promise<PreviewItem[]> {
     const items: PreviewItem[] = [];
 
     // Preview IDE-specific configurations
@@ -306,7 +312,7 @@ export class FileGenerator {
     console.log('Amazon Q Developer configuration generation not implemented yet');
   }
 
-  private async updateGitignore(instructions: ParsedInstructions): Promise<void> {
+  private async updateGitignore(instructions: GeneratorInstructions): Promise<void> {
     const gitignorePath = path.join(this.basePath, '.gitignore');
     let gitignoreContent = '';
 
@@ -463,7 +469,7 @@ export class FileGenerator {
     }];
   }
 
-  private async previewGitignore(instructions: ParsedInstructions): Promise<PreviewItem | null> {
+  private async previewGitignore(instructions: GeneratorInstructions): Promise<PreviewItem | null> {
     const gitignorePath = path.join(this.basePath, '.gitignore');
     let gitignoreContent = '';
 

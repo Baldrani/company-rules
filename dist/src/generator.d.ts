@@ -1,4 +1,9 @@
-import { ParsedInstructions } from './parser';
+import { Instruction } from './parser';
+export interface GeneratorInstructions {
+    ides: string[];
+    agents: string[];
+    instructions: Instruction[];
+}
 export interface PreviewItem {
     path: string;
     type: 'file' | 'directory';
@@ -9,8 +14,8 @@ export declare class FileGenerator {
     private llmService;
     private basePath;
     constructor(basePath?: string);
-    generate(instructions: ParsedInstructions): Promise<void>;
-    preview(instructions: ParsedInstructions): Promise<PreviewItem[]>;
+    generate(instructions: GeneratorInstructions): Promise<void>;
+    preview(instructions: GeneratorInstructions): Promise<PreviewItem[]>;
     private generateIDEConfig;
     private generateAgentConfig;
     private previewIDEConfig;

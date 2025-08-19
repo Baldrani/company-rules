@@ -523,6 +523,24 @@ program
           }
         }
       });
+
+      // Clean up empty parent directories  
+      const directoriesToCheck = ['.vscode', 'cursor'];
+      
+      directoriesToCheck.forEach(dir => {
+        if (fs.existsSync(dir)) {
+          try {
+            const contents = fs.readdirSync(dir);
+            if (contents.length === 0) {
+              fs.rmdirSync(dir);
+              console.log(chalk.gray(`   ℹ️  Removed empty directory: ${dir}`));
+            }
+          } catch (error) {
+            // Directory might not be empty or have permission issues
+            console.log(chalk.yellow(`   ⚠️  Could not remove directory ${dir}: ${error instanceof Error ? error.message : error}`));
+          }
+        }
+      });
       
       spinner.succeed(chalk.green('Generated files cleaned successfully!'));
     } catch (error) {
@@ -606,13 +624,23 @@ program
         }
       });
 
-      // Also clean up .vscode directory if it's empty
-      if (fs.existsSync('.vscode')) {
-        const vscodeContents = fs.readdirSync('.vscode');
-        if (vscodeContents.length === 0) {
-          fs.rmdirSync('.vscode');
+      // Clean up empty parent directories
+      const directoriesToCheck = ['.vscode', 'cursor'];
+      
+      directoriesToCheck.forEach(dir => {
+        if (fs.existsSync(dir)) {
+          try {
+            const contents = fs.readdirSync(dir);
+            if (contents.length === 0) {
+              fs.rmdirSync(dir);
+              console.log(chalk.gray(`   ℹ️  Removed empty directory: ${dir}`));
+            }
+          } catch (error) {
+            // Directory might not be empty or have permission issues
+            console.log(chalk.yellow(`   ⚠️  Could not remove directory ${dir}: ${error instanceof Error ? error.message : error}`));
+          }
         }
-      }
+      });
 
       // Remove generated entries from .gitignore
       const gitignorePath = './.gitignore';

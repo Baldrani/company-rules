@@ -77,6 +77,22 @@ program
         
         const choices = await inquirer.prompt([
           {
+            type: 'confirm',
+            name: 'useLLM',
+            message: 'Would you like to use AI-powered detailed rule generation? (Transforms basic rules into comprehensive guidelines)',
+            default: false
+          },
+          {
+            type: 'list',
+            name: 'llmProvider',
+            message: 'Which AI provider would you like to use?',
+            choices: [
+              { name: 'OpenAI (ChatGPT) - Requires OPENAI_API_KEY', value: 'openai' },
+              { name: 'Anthropic (Claude) - Requires ANTHROPIC_API_KEY', value: 'anthropic' }
+            ],
+            when: (answers) => answers.useLLM
+          },
+          {
             type: 'checkbox',
             name: 'selectedIdes',
             message: 'Which IDEs would you like to configure?',
@@ -109,6 +125,71 @@ program
           }
         ]);
 
+        // Handle LLM setup if requested
+        if (choices.useLLM) {
+          const envVar = choices.llmProvider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY';
+          const existingKey = process.env[envVar];
+          
+          if (!existingKey) {
+            console.log(chalk.yellow(`\n⚠️  ${envVar} environment variable not found.`));
+            
+            const { provideKey } = await inquirer.prompt([
+              {
+                type: 'confirm',
+                name: 'provideKey',
+                message: `Would you like to enter your ${choices.llmProvider === 'openai' ? 'OpenAI' : 'Anthropic'} API key now?`,
+                default: true
+              }
+            ]);
+            
+            if (provideKey) {
+              const { apiKey } = await inquirer.prompt([
+                {
+                  type: 'password',
+                  name: 'apiKey',
+                  message: `Enter your ${choices.llmProvider === 'openai' ? 'OpenAI' : 'Anthropic'} API key:`,
+                  mask: '*',
+                  validate: (input) => {
+                    if (!input || input.trim().length === 0) {
+                      return 'API key cannot be empty';
+                    }
+                    if (choices.llmProvider === 'openai' && !input.startsWith('sk-')) {
+                      return 'OpenAI API keys typically start with "sk-"';
+                    }
+                    if (choices.llmProvider === 'anthropic' && !input.startsWith('sk-ant-')) {
+                      return 'Anthropic API keys typically start with "sk-ant-"';
+                    }
+                    return true;
+                  }
+                }
+              ]);
+              
+              // Temporarily set the environment variable for this session
+              process.env[envVar] = apiKey.trim();
+              console.log(chalk.green(`✅ API key set for this session - LLM enhancement enabled\n`));
+              console.log(chalk.gray(`💡 To persist this key, add to your shell profile: export ${envVar}="your_api_key"`));
+            } else {
+              const { continueWithoutLLM } = await inquirer.prompt([
+                {
+                  type: 'confirm',
+                  name: 'continueWithoutLLM',
+                  message: 'Continue without LLM enhancement?',
+                  default: true
+                }
+              ]);
+              
+              if (!continueWithoutLLM) {
+                console.log(chalk.cyan('💡 Run the command again to set up LLM enhancement.'));
+                process.exit(0);
+              } else {
+                console.log(chalk.gray('   Continuing with basic rule generation...\n'));
+              }
+            }
+          } else {
+            console.log(chalk.green(`✅ Found ${envVar} - LLM enhancement enabled\n`));
+          }
+        }
+
         selectedIdes = choices.selectedIdes || DEFAULT_SELECTED_IDES;
         selectedAgents = choices.selectedAgents || DEFAULT_SELECTED_AGENTS;
         selectedInstructions = parsedInstructions.instructions.filter(instruction => 
@@ -130,13 +211,16 @@ program
 
       console.log(chalk.green(`\n✅ Configuration: ${instructions.ides.length} IDEs, ${instructions.agents.length} agents, ${instructions.instructions.length} instructions\n`));
       
-      // Check LLM availability
+      // Check LLM availability (but don't show warning in interactive mode since we already handled it)
       const llmService = LLMService.fromEnvironment();
-      if (llmService) {
-        console.log(chalk.green('🤖 LLM service detected - will generate rich, detailed instructions'));
-      } else {
-        console.log(chalk.yellow('⚠️  No LLM API key found - using basic instructions'));
-        console.log(chalk.gray('   Set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable for enhanced rule generation'));
+      if (!options.interactive) {
+        if (llmService) {
+          console.log(chalk.green('🤖 LLM service detected - will generate rich, detailed instructions'));
+        } else {
+          console.log(chalk.yellow('⚠️  No LLM API key found - using basic instructions'));
+          console.log(chalk.gray('   Set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable for enhanced rule generation'));
+          console.log(chalk.gray('   Or use --interactive to configure LLM enhancement'));
+        }
       }
 
       // Generate files

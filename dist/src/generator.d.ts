@@ -7,7 +7,8 @@ export interface PreviewItem {
 }
 export declare class FileGenerator {
     private llmService;
-    constructor();
+    private basePath;
+    constructor(basePath?: string);
     generate(instructions: ParsedInstructions): Promise<void>;
     preview(instructions: ParsedInstructions): Promise<PreviewItem[]>;
     private generateIDEConfig;
@@ -16,9 +17,18 @@ export declare class FileGenerator {
     private previewAgentConfig;
     private generateCursorRules;
     private generateVSCodeSettings;
-    private generatePhpStormSettings;
+    private generateJetBrainsSettings;
+    private generateSublimeSettings;
+    private generateVimConfig;
+    private generateEmacsConfig;
     private generateClaudeConfig;
     private generateCopilotConfig;
+    private generateCodeiumConfig;
+    private generateTabnineConfig;
+    private generateChatGPTConfig;
+    private generateGeminiConfig;
+    private generateSourcegraphConfig;
+    private generateAmazonQConfig;
     private updateGitignore;
     private sanitizeFilename;
     private previewCursorRules;

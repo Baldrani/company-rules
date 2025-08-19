@@ -11,6 +11,7 @@ import boxen from 'boxen';
 import { InstructionParser } from './parser';
 import { FileGenerator } from './generator';
 import { LLMService } from './llm-service';
+import { SUPPORTED_IDES, SUPPORTED_AGENTS, DEFAULT_SELECTED_IDES, DEFAULT_SELECTED_AGENTS } from './constants';
 
 const program = new Command();
 
@@ -77,23 +78,21 @@ program
             type: 'checkbox',
             name: 'selectedIdes',
             message: 'Which IDEs would you like to configure?',
-            choices: instructions.ides.map(ide => ({
-              name: ide.charAt(0).toUpperCase() + ide.slice(1),
-              value: ide,
-              checked: true
-            })),
-            when: instructions.ides.length > 0
+            choices: SUPPORTED_IDES.map(ide => ({
+              name: `${ide.name} - ${ide.description}`,
+              value: ide.value,
+              checked: instructions.ides.includes(ide.value) || DEFAULT_SELECTED_IDES.includes(ide.value)
+            }))
           },
           {
             type: 'checkbox', 
             name: 'selectedAgents',
             message: 'Which AI agents would you like to configure?',
-            choices: instructions.agents.map(agent => ({
-              name: agent.charAt(0).toUpperCase() + agent.slice(1),
-              value: agent,
-              checked: true
-            })),
-            when: instructions.agents.length > 0
+            choices: SUPPORTED_AGENTS.map(agent => ({
+              name: `${agent.name} - ${agent.description}`,
+              value: agent.value,
+              checked: instructions.agents.includes(agent.value) || DEFAULT_SELECTED_AGENTS.includes(agent.value)
+            }))
           },
           {
             type: 'checkbox',
@@ -131,7 +130,8 @@ program
 
       // Generate files
       const genSpinner = ora('Generating configuration files...').start();
-      const generator = new FileGenerator();
+      const configDir = path.dirname(configPath);
+      const generator = new FileGenerator(configDir);
       
       await generator.generate(instructions);
       
@@ -218,24 +218,21 @@ program
           type: 'checkbox',
           name: 'ides',
           message: 'Which IDEs do you use?',
-          choices: [
-            { name: 'Cursor', value: 'cursor' },
-            { name: 'VSCode', value: 'vscode' },
-            { name: 'PHPStorm', value: 'phpstorm' },
-            { name: 'WebStorm', value: 'webstorm' }
-          ],
-          default: ['cursor', 'vscode']
+          choices: SUPPORTED_IDES.map(ide => ({
+            name: `${ide.name} - ${ide.description}`,
+            value: ide.value
+          })),
+          default: DEFAULT_SELECTED_IDES
         },
         {
           type: 'checkbox',
           name: 'agents',
           message: 'Which AI coding assistants do you use?',
-          choices: [
-            { name: 'Claude (Anthropic)', value: 'claude' },
-            { name: 'GitHub Copilot', value: 'copilot' },
-            { name: 'Codeium', value: 'codeium' }
-          ],
-          default: ['claude', 'copilot']
+          choices: SUPPORTED_AGENTS.map(agent => ({
+            name: `${agent.name} - ${agent.description}`,
+            value: agent.value
+          })),
+          default: DEFAULT_SELECTED_AGENTS
         },
         {
           type: 'checkbox',
@@ -294,8 +291,8 @@ program
     } else {
       // Default configuration
       config = {
-        ides: ['cursor', 'vscode'],
-        agents: ['copilot', 'claude'],
+        ides: DEFAULT_SELECTED_IDES,
+        agents: DEFAULT_SELECTED_AGENTS,
         instructions: [
           { name: 'use tabs instead of spaces', files: '*.{ts,tsx,js,jsx}' },
           { name: 'minimize use of ai generated comments' },
@@ -553,6 +550,7 @@ program
 // Reset command
 program
   .command('reset')
+  .alias('clean')
   .description('Reset project to clean state by removing all generated files and configurations')
   .option('--confirm', 'Skip confirmation prompt')
   .action(async (options) => {
@@ -706,7 +704,8 @@ program
       const parser = new InstructionParser(config);
       const instructions = parser.parse();
       
-      const generator = new FileGenerator();
+      const configDir = path.dirname(configPath);
+      const generator = new FileGenerator(configDir);
       const previewItems = await generator.preview(instructions);
       
       spinner.succeed(chalk.green('Preview generated successfully!'));

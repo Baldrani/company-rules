@@ -48,6 +48,7 @@ const boxen_1 = __importDefault(require("boxen"));
 const parser_1 = require("./parser");
 const generator_1 = require("./generator");
 const llm_service_1 = require("./llm-service");
+const constants_1 = require("./constants");
 const program = new commander_1.Command();
 program
     .name('instructor')
@@ -97,23 +98,21 @@ program
                     type: 'checkbox',
                     name: 'selectedIdes',
                     message: 'Which IDEs would you like to configure?',
-                    choices: instructions.ides.map(ide => ({
-                        name: ide.charAt(0).toUpperCase() + ide.slice(1),
-                        value: ide,
-                        checked: true
-                    })),
-                    when: instructions.ides.length > 0
+                    choices: constants_1.SUPPORTED_IDES.map(ide => ({
+                        name: `${ide.name} - ${ide.description}`,
+                        value: ide.value,
+                        checked: instructions.ides.includes(ide.value) || constants_1.DEFAULT_SELECTED_IDES.includes(ide.value)
+                    }))
                 },
                 {
                     type: 'checkbox',
                     name: 'selectedAgents',
                     message: 'Which AI agents would you like to configure?',
-                    choices: instructions.agents.map(agent => ({
-                        name: agent.charAt(0).toUpperCase() + agent.slice(1),
-                        value: agent,
-                        checked: true
-                    })),
-                    when: instructions.agents.length > 0
+                    choices: constants_1.SUPPORTED_AGENTS.map(agent => ({
+                        name: `${agent.name} - ${agent.description}`,
+                        value: agent.value,
+                        checked: instructions.agents.includes(agent.value) || constants_1.DEFAULT_SELECTED_AGENTS.includes(agent.value)
+                    }))
                 },
                 {
                     type: 'checkbox',
@@ -146,7 +145,8 @@ program
         }
         // Generate files
         const genSpinner = (0, ora_1.default)('Generating configuration files...').start();
-        const generator = new generator_1.FileGenerator();
+        const configDir = path.dirname(configPath);
+        const generator = new generator_1.FileGenerator(configDir);
         await generator.generate(instructions);
         genSpinner.succeed(chalk_1.default.green('Configuration files generated successfully!'));
         // Show generated files
@@ -216,24 +216,21 @@ program
                 type: 'checkbox',
                 name: 'ides',
                 message: 'Which IDEs do you use?',
-                choices: [
-                    { name: 'Cursor', value: 'cursor' },
-                    { name: 'VSCode', value: 'vscode' },
-                    { name: 'PHPStorm', value: 'phpstorm' },
-                    { name: 'WebStorm', value: 'webstorm' }
-                ],
-                default: ['cursor', 'vscode']
+                choices: constants_1.SUPPORTED_IDES.map(ide => ({
+                    name: `${ide.name} - ${ide.description}`,
+                    value: ide.value
+                })),
+                default: constants_1.DEFAULT_SELECTED_IDES
             },
             {
                 type: 'checkbox',
                 name: 'agents',
                 message: 'Which AI coding assistants do you use?',
-                choices: [
-                    { name: 'Claude (Anthropic)', value: 'claude' },
-                    { name: 'GitHub Copilot', value: 'copilot' },
-                    { name: 'Codeium', value: 'codeium' }
-                ],
-                default: ['claude', 'copilot']
+                choices: constants_1.SUPPORTED_AGENTS.map(agent => ({
+                    name: `${agent.name} - ${agent.description}`,
+                    value: agent.value
+                })),
+                default: constants_1.DEFAULT_SELECTED_AGENTS
             },
             {
                 type: 'checkbox',
@@ -281,8 +278,8 @@ program
     else {
         // Default configuration
         config = {
-            ides: ['cursor', 'vscode'],
-            agents: ['copilot', 'claude'],
+            ides: constants_1.DEFAULT_SELECTED_IDES,
+            agents: constants_1.DEFAULT_SELECTED_AGENTS,
             instructions: [
                 { name: 'use tabs instead of spaces', files: '*.{ts,tsx,js,jsx}' },
                 { name: 'minimize use of ai generated comments' },
@@ -494,6 +491,7 @@ program
 // Reset command
 program
     .command('reset')
+    .alias('clean')
     .description('Reset project to clean state by removing all generated files and configurations')
     .option('--confirm', 'Skip confirmation prompt')
     .action(async (options) => {
@@ -617,7 +615,8 @@ program
         const config = yaml.parse(yamlContent);
         const parser = new parser_1.InstructionParser(config);
         const instructions = parser.parse();
-        const generator = new generator_1.FileGenerator();
+        const configDir = path.dirname(configPath);
+        const generator = new generator_1.FileGenerator(configDir);
         const previewItems = await generator.preview(instructions);
         spinner.succeed(chalk_1.default.green('Preview generated successfully!'));
         console.log(chalk_1.default.bold.green(`\n📋 Would generate ${previewItems.length} items:`));

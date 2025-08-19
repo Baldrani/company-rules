@@ -1,0 +1,51 @@
+{
+  "name": "@launchmetrics/rules-package",
+  "version": "1.0.0",
+  "description": "Private npm package for IDE and agent configuration rules",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "instructor": "dist/src/cli.js"
+  },
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "test": "jest"
+  },
+  "keywords": [
+    "ide",
+    "agent",
+    "configuration",
+    "rules",
+    "company"
+  ],
+  "author": "Launchmetrics",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "yaml": "^2.3.0",
+    "commander": "^11.0.0",
+    "chalk": "^4.1.2",
+    "inquirer": "^8.2.6",
+    "ora": "^5.4.1",
+    "boxen": "^5.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@types/inquirer": "^8.2.6",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist/",
+    "templates/",
+    "types/"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

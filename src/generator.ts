@@ -330,6 +330,37 @@ export class FileGenerator {
       }
     }
 
+    // Add agent-specific files to gitignore
+    if (instructions.agents.includes('claude')) {
+      if (!gitignoreContent.includes('CLAUDE.md')) {
+        newEntries.push('CLAUDE.md');
+      }
+    }
+
+    if (instructions.agents.includes('copilot')) {
+      if (!gitignoreContent.includes('copilot-instructions.md')) {
+        newEntries.push('copilot-instructions.md');
+      }
+    }
+
+    // Add other agent files when implemented
+    const otherAgentFiles = [
+      { agent: 'codeium', file: 'codeium-instructions.md' },
+      { agent: 'tabnine', file: 'tabnine-instructions.md' },
+      { agent: 'chatgpt', file: 'chatgpt-instructions.md' },
+      { agent: 'gemini', file: 'gemini-instructions.md' },
+      { agent: 'sourcegraph', file: 'sourcegraph-instructions.md' },
+      { agent: 'amazon-q', file: 'amazon-q-instructions.md' }
+    ];
+
+    otherAgentFiles.forEach(({ agent, file }) => {
+      if (instructions.agents.includes(agent)) {
+        if (!gitignoreContent.includes(file)) {
+          newEntries.push(file);
+        }
+      }
+    });
+
     // Add the new entries to .gitignore
     if (newEntries.length > 0) {
       if (gitignoreContent && !gitignoreContent.endsWith('\n')) {
@@ -486,6 +517,37 @@ export class FileGenerator {
         newEntries.push('cursor/rules/');
       }
     }
+
+    // Add agent-specific files to gitignore
+    if (instructions.agents.includes('claude')) {
+      if (!gitignoreContent.includes('CLAUDE.md')) {
+        newEntries.push('CLAUDE.md');
+      }
+    }
+
+    if (instructions.agents.includes('copilot')) {
+      if (!gitignoreContent.includes('copilot-instructions.md')) {
+        newEntries.push('copilot-instructions.md');
+      }
+    }
+
+    // Add other agent files when implemented
+    const otherAgentFiles = [
+      { agent: 'codeium', file: 'codeium-instructions.md' },
+      { agent: 'tabnine', file: 'tabnine-instructions.md' },
+      { agent: 'chatgpt', file: 'chatgpt-instructions.md' },
+      { agent: 'gemini', file: 'gemini-instructions.md' },
+      { agent: 'sourcegraph', file: 'sourcegraph-instructions.md' },
+      { agent: 'amazon-q', file: 'amazon-q-instructions.md' }
+    ];
+
+    otherAgentFiles.forEach(({ agent, file }) => {
+      if (instructions.agents.includes(agent)) {
+        if (!gitignoreContent.includes(file)) {
+          newEntries.push(file);
+        }
+      }
+    });
 
     if (newEntries.length === 0) {
       return null;

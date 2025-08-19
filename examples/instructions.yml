@@ -1,0 +1,92 @@
+# Example instructions.yml - Company Rules Package
+# This file shows various types of rules you can define for your development team
+# The CLI will ask you which IDEs and agents to configure when you run 'instructor install'
+
+instructions:
+  # Code formatting and style rules
+  - name: use tabs instead of spaces
+    description: use tabs for indentation to ensure consistent formatting across editors
+    files: "*.{ts,tsx,js,jsx,py,go,rust}"
+
+  - name: use tailwind for styling
+    description: prefer tailwind utility classes over custom css for consistent design system
+    files: "*.{tsx,jsx,vue,html}"
+
+  - name: use semantic variable names
+    description: choose descriptive variable names that explain intent rather than implementation
+    files: "*.{ts,js,py,go,rust,java,cs}"
+
+  # Code quality and practices
+  - name: minimize use of ai generated comments
+    description: write self-documenting code instead of explaining obvious logic in comments
+
+  - name: prefer composition over inheritance
+    description: favor composing objects and functions rather than complex inheritance hierarchies
+    files: "*.{ts,js,py,go,java,cs,cpp}"
+
+  - name: handle errors explicitly
+    description: always handle potential errors rather than ignoring them or using silent failures
+    files: "*.{ts,js,py,go,rust,java,cs}"
+
+  # Testing rules
+  - name: never change assertions to make tests pass
+    description: if a test is failing, fix the code or update the test logic, never just change assertions
+    files: "*.test.*,*.spec.*"
+
+  - name: write tests for edge cases
+    description: include tests for boundary conditions, null values, empty arrays, and error scenarios
+    files: "*.test.*,*.spec.*"
+
+  - name: use descriptive test names
+    description: test names should clearly describe what behavior is being tested
+    files: "*.test.*,*.spec.*"
+
+  # Code organization
+  - name: do not refactor existing components unless explicitly requested
+    description: focus on the specific task rather than improving unrelated code
+
+  - name: remove unused imports after changing a file
+    description: clean up imports that are no longer needed to keep dependencies minimal
+    files: "*.{ts,tsx,js,jsx,py}"
+
+  - name: group related functions together
+    description: organize code by feature or domain rather than by technical layer
+    files: "*.{ts,js,py,go,rust,java,cs}"
+
+  # Security and best practices
+  - name: never commit secrets or api keys
+    description: use environment variables or secure credential stores instead of hardcoding sensitive data
+
+  - name: validate user input
+    description: always sanitize and validate data from external sources including forms and apis
+    files: "*.{ts,js,py,go,java,cs,php}"
+
+  - name: use strict type checking
+    description: enable strict mode and avoid any types to catch potential runtime errors at compile time
+    files: "*.{ts,tsx}"
+
+  # Performance rules
+  - name: optimize for readability first
+    description: write clear readable code first then optimize for performance only when needed
+
+  - name: lazy load large dependencies
+    description: defer loading of heavy libraries until they are actually needed
+    files: "*.{ts,tsx,js,jsx}"
+
+  # Database and API rules
+  - name: use prepared statements for database queries
+    description: prevent sql injection by using parameterized queries instead of string concatenation
+    files: "*.{ts,js,py,go,java,cs,php}"
+
+  - name: implement proper error handling for api calls
+    description: handle network failures timeouts and invalid responses gracefully
+    files: "*.{ts,js,py,go,java,cs}"
+
+  # Documentation rules
+  - name: document public api methods
+    description: provide clear documentation for functions that are used by other modules or external consumers
+    files: "*.{ts,js,py,go,rust,java,cs}"
+
+  - name: keep readme files up to date
+    description: ensure setup instructions and project documentation reflect current state
+    files: "README.md,*.md"

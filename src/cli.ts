@@ -8,8 +8,9 @@ import chalk from 'chalk';
 import inquirer from 'inquirer';
 import ora from 'ora';
 import boxen from 'boxen';
-import { InstructionParser, ValidationResult } from './parser';
-import { FileGenerator, PreviewItem } from './generator';
+import { InstructionParser } from './parser';
+import { FileGenerator } from './generator';
+import { LLMService } from './llm-service';
 
 const program = new Command();
 
@@ -23,6 +24,7 @@ program
   .description('Generate configuration files from instructions.yml')
   .option('-c, --config <path>', 'Path to instructions.yml file', './instructions.yml')
   .option('--verbose', 'Show detailed output')
+  .option('--interactive', 'Choose which IDEs, agents, and instructions to use')
   .action(async (options) => {
     try {
       const configPath = path.resolve(options.config);
@@ -56,7 +58,7 @@ program
       const config = yaml.parse(yamlContent);
       
       const parser = new InstructionParser(config);
-      const instructions = parser.parse();
+      let instructions = parser.parse();
       
       parseSpinner.succeed(chalk.green(`Parsed ${instructions.instructions.length} instructions for ${instructions.ides.length} IDEs and ${instructions.agents.length} agents`));
       
@@ -65,7 +67,68 @@ program
         console.log(chalk.gray('Agents:'), instructions.agents.join(', '));
         console.log(chalk.gray('Instructions:'), instructions.instructions.map(i => i.name).join(', '));
       }
+
+      // Interactive mode: let user choose what to actually use
+      if (options.interactive) {
+        console.log(chalk.cyan('\n🎯 Let\'s customize your installation:\n'));
+        
+        const choices = await inquirer.prompt([
+          {
+            type: 'checkbox',
+            name: 'selectedIdes',
+            message: 'Which IDEs would you like to configure?',
+            choices: instructions.ides.map(ide => ({
+              name: ide.charAt(0).toUpperCase() + ide.slice(1),
+              value: ide,
+              checked: true
+            })),
+            when: instructions.ides.length > 0
+          },
+          {
+            type: 'checkbox', 
+            name: 'selectedAgents',
+            message: 'Which AI agents would you like to configure?',
+            choices: instructions.agents.map(agent => ({
+              name: agent.charAt(0).toUpperCase() + agent.slice(1),
+              value: agent,
+              checked: true
+            })),
+            when: instructions.agents.length > 0
+          },
+          {
+            type: 'checkbox',
+            name: 'selectedInstructions',
+            message: 'Which instructions would you like to include?',
+            choices: instructions.instructions.map(instruction => ({
+              name: instruction.name,
+              value: instruction.name,
+              checked: true
+            })),
+            when: instructions.instructions.length > 0
+          }
+        ]);
+
+        // Filter instructions based on user selection
+        instructions = {
+          ides: choices.selectedIdes || instructions.ides,
+          agents: choices.selectedAgents || instructions.agents,
+          instructions: instructions.instructions.filter(instruction => 
+            choices.selectedInstructions?.includes(instruction.name) ?? true
+          )
+        };
+
+        console.log(chalk.green(`\n✅ Selected: ${instructions.ides.length} IDEs, ${instructions.agents.length} agents, ${instructions.instructions.length} instructions\n`));
+      }
       
+      // Check LLM availability
+      const llmService = LLMService.fromEnvironment();
+      if (llmService) {
+        console.log(chalk.green('🤖 LLM service detected - will generate rich, detailed instructions'));
+      } else {
+        console.log(chalk.yellow('⚠️  No LLM API key found - using basic instructions'));
+        console.log(chalk.gray('   Set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable for enhanced rule generation'));
+      }
+
       // Generate files
       const genSpinner = ora('Generating configuration files...').start();
       const generator = new FileGenerator();
@@ -140,7 +203,8 @@ program
 
       if (!overwrite) {
         console.log(chalk.yellow('📝 Edit the existing file to customize your project rules'));
-        console.log(chalk.cyan('🚀 Then run:'), chalk.white.bold('npx instructor install'));
+        console.log(chalk.gray('💡 Or check out'), chalk.cyan('examples/instructions.yml'), chalk.gray('for inspiration'));
+        console.log(chalk.cyan('🚀 Then run:'), chalk.white.bold('npx instructor install --interactive'));
         return;
       }
     }
@@ -257,7 +321,8 @@ program
     console.log(boxen(
       chalk.green('Next steps:') + '\n\n' +
       chalk.gray('1. Review and customize ') + chalk.cyan('instructions.yml') + '\n' +
-      chalk.gray('2. Run ') + chalk.cyan.bold('instructor install') + chalk.gray(' to generate configs') + '\n' +
+      chalk.gray('   💡 Check ') + chalk.cyan('examples/instructions.yml') + chalk.gray(' for more rule ideas') + '\n' +
+      chalk.gray('2. Run ') + chalk.cyan.bold('instructor install --interactive') + chalk.gray(' to choose IDEs/agents') + '\n' +
       chalk.gray('3. Use ') + chalk.cyan.bold('instructor validate') + chalk.gray(' to check your setup'),
       { 
         padding: 1, 
@@ -481,6 +546,127 @@ program
       spinner.succeed(chalk.green('Generated files cleaned successfully!'));
     } catch (error) {
       spinner.fail(chalk.red('Error cleaning files:') + ' ' + (error instanceof Error ? error.message : error));
+      process.exit(1);
+    }
+  });
+
+// Reset command
+program
+  .command('reset')
+  .description('Reset project to clean state by removing all generated files and configurations')
+  .option('--confirm', 'Skip confirmation prompt')
+  .action(async (options) => {
+    console.log(boxen(
+      chalk.bold.red('🔄 Reset Project to Clean State'),
+      { 
+        padding: 1, 
+        borderColor: 'red', 
+        borderStyle: 'round',
+        margin: 1
+      }
+    ));
+
+    const filesToReset = [
+      'instructions.yml',
+      'CLAUDE.md',
+      'copilot-instructions.md',
+      '.vscode/settings.json',
+      'cursor/rules',
+      '.cursorrules'
+    ];
+
+    const existingFiles = filesToReset.filter(file => fs.existsSync(file));
+    
+    if (existingFiles.length === 0) {
+      console.log(chalk.yellow('ℹ️  Project is already in clean state - no generated files found'));
+      return;
+    }
+
+    console.log('The following files and directories will be removed:');
+    existingFiles.forEach(file => {
+      console.log(chalk.red('   ✗'), file);
+    });
+
+    let shouldReset = options.confirm;
+    if (!shouldReset) {
+      const { confirm } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'confirm',
+          message: 'Are you sure you want to reset the project? This will remove all configuration files.',
+          default: false
+        }
+      ]);
+      shouldReset = confirm;
+    }
+
+    if (!shouldReset) {
+      console.log(chalk.yellow('Reset cancelled'));
+      return;
+    }
+
+    const spinner = ora('Resetting project to clean state...').start();
+    
+    try {
+      existingFiles.forEach(file => {
+        if (fs.existsSync(file)) {
+          if (fs.statSync(file).isDirectory()) {
+            fs.rmSync(file, { recursive: true, force: true });
+          } else {
+            fs.unlinkSync(file);
+          }
+        }
+      });
+
+      // Also clean up .vscode directory if it's empty
+      if (fs.existsSync('.vscode')) {
+        const vscodeContents = fs.readdirSync('.vscode');
+        if (vscodeContents.length === 0) {
+          fs.rmdirSync('.vscode');
+        }
+      }
+
+      // Remove generated entries from .gitignore
+      const gitignorePath = './.gitignore';
+      if (fs.existsSync(gitignorePath)) {
+        let gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+        const linesToRemove = [
+          'cursor/rules/',
+          '# Generated by @launchmetrics/rules-package',
+          '# WARNING: Do not manually add generated files to git - they should remain gitignored'
+        ];
+        
+        const lines = gitignoreContent.split('\n');
+        const filteredLines = lines.filter(line => !linesToRemove.some(remove => line.includes(remove)));
+        
+        // Remove empty lines at the end
+        while (filteredLines.length > 0 && filteredLines[filteredLines.length - 1]?.trim() === '') {
+          filteredLines.pop();
+        }
+        
+        if (filteredLines.length !== lines.length) {
+          fs.writeFileSync(gitignorePath, filteredLines.join('\n') + (filteredLines.length > 0 ? '\n' : ''));
+        }
+      }
+      
+      spinner.succeed(chalk.green('Project reset to clean state successfully!'));
+
+      console.log(boxen(
+        chalk.green('✨ Clean slate!') + '\n\n' +
+        'Your project is now in a clean state.\n\n' +
+        chalk.gray('Next steps:') + '\n' +
+        chalk.gray('• Run ') + chalk.cyan.bold('instructor init') + chalk.gray(' to create a new configuration') + '\n' +
+        chalk.gray('• Run ') + chalk.cyan.bold('instructor install') + chalk.gray(' to generate config files'),
+        { 
+          padding: 1, 
+          borderColor: 'green', 
+          borderStyle: 'round',
+          margin: 1
+        }
+      ));
+
+    } catch (error) {
+      spinner.fail(chalk.red('Error resetting project:') + ' ' + (error instanceof Error ? error.message : error));
       process.exit(1);
     }
   });

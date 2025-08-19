@@ -47,6 +47,7 @@ const ora_1 = __importDefault(require("ora"));
 const boxen_1 = __importDefault(require("boxen"));
 const parser_1 = require("./parser");
 const generator_1 = require("./generator");
+const llm_service_1 = require("./llm-service");
 const program = new commander_1.Command();
 program
     .name('instructor')
@@ -57,6 +58,7 @@ program
     .description('Generate configuration files from instructions.yml')
     .option('-c, --config <path>', 'Path to instructions.yml file', './instructions.yml')
     .option('--verbose', 'Show detailed output')
+    .option('--interactive', 'Choose which IDEs, agents, and instructions to use')
     .action(async (options) => {
     try {
         const configPath = path.resolve(options.config);
@@ -80,12 +82,67 @@ program
         const yamlContent = fs.readFileSync(configPath, 'utf8');
         const config = yaml.parse(yamlContent);
         const parser = new parser_1.InstructionParser(config);
-        const instructions = parser.parse();
+        let instructions = parser.parse();
         parseSpinner.succeed(chalk_1.default.green(`Parsed ${instructions.instructions.length} instructions for ${instructions.ides.length} IDEs and ${instructions.agents.length} agents`));
         if (options.verbose) {
             console.log(chalk_1.default.gray('IDEs:'), instructions.ides.join(', '));
             console.log(chalk_1.default.gray('Agents:'), instructions.agents.join(', '));
             console.log(chalk_1.default.gray('Instructions:'), instructions.instructions.map(i => i.name).join(', '));
+        }
+        // Interactive mode: let user choose what to actually use
+        if (options.interactive) {
+            console.log(chalk_1.default.cyan('\n🎯 Let\'s customize your installation:\n'));
+            const choices = await inquirer_1.default.prompt([
+                {
+                    type: 'checkbox',
+                    name: 'selectedIdes',
+                    message: 'Which IDEs would you like to configure?',
+                    choices: instructions.ides.map(ide => ({
+                        name: ide.charAt(0).toUpperCase() + ide.slice(1),
+                        value: ide,
+                        checked: true
+                    })),
+                    when: instructions.ides.length > 0
+                },
+                {
+                    type: 'checkbox',
+                    name: 'selectedAgents',
+                    message: 'Which AI agents would you like to configure?',
+                    choices: instructions.agents.map(agent => ({
+                        name: agent.charAt(0).toUpperCase() + agent.slice(1),
+                        value: agent,
+                        checked: true
+                    })),
+                    when: instructions.agents.length > 0
+                },
+                {
+                    type: 'checkbox',
+                    name: 'selectedInstructions',
+                    message: 'Which instructions would you like to include?',
+                    choices: instructions.instructions.map(instruction => ({
+                        name: instruction.name,
+                        value: instruction.name,
+                        checked: true
+                    })),
+                    when: instructions.instructions.length > 0
+                }
+            ]);
+            // Filter instructions based on user selection
+            instructions = {
+                ides: choices.selectedIdes || instructions.ides,
+                agents: choices.selectedAgents || instructions.agents,
+                instructions: instructions.instructions.filter(instruction => choices.selectedInstructions?.includes(instruction.name) ?? true)
+            };
+            console.log(chalk_1.default.green(`\n✅ Selected: ${instructions.ides.length} IDEs, ${instructions.agents.length} agents, ${instructions.instructions.length} instructions\n`));
+        }
+        // Check LLM availability
+        const llmService = llm_service_1.LLMService.fromEnvironment();
+        if (llmService) {
+            console.log(chalk_1.default.green('🤖 LLM service detected - will generate rich, detailed instructions'));
+        }
+        else {
+            console.log(chalk_1.default.yellow('⚠️  No LLM API key found - using basic instructions'));
+            console.log(chalk_1.default.gray('   Set OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable for enhanced rule generation'));
         }
         // Generate files
         const genSpinner = (0, ora_1.default)('Generating configuration files...').start();
@@ -146,7 +203,8 @@ program
         ]);
         if (!overwrite) {
             console.log(chalk_1.default.yellow('📝 Edit the existing file to customize your project rules'));
-            console.log(chalk_1.default.cyan('🚀 Then run:'), chalk_1.default.white.bold('npx instructor install'));
+            console.log(chalk_1.default.gray('💡 Or check out'), chalk_1.default.cyan('examples/instructions.yml'), chalk_1.default.gray('for inspiration'));
+            console.log(chalk_1.default.cyan('🚀 Then run:'), chalk_1.default.white.bold('npx instructor install --interactive'));
             return;
         }
     }
@@ -242,7 +300,8 @@ program
     console.log(chalk_1.default.gray('🎯 Configured for:'), config.ides.length > 0 ? config.ides.join(', ') : 'no IDEs', 'and', config.agents.length > 0 ? config.agents.join(', ') : 'no agents');
     console.log((0, boxen_1.default)(chalk_1.default.green('Next steps:') + '\n\n' +
         chalk_1.default.gray('1. Review and customize ') + chalk_1.default.cyan('instructions.yml') + '\n' +
-        chalk_1.default.gray('2. Run ') + chalk_1.default.cyan.bold('instructor install') + chalk_1.default.gray(' to generate configs') + '\n' +
+        chalk_1.default.gray('   💡 Check ') + chalk_1.default.cyan('examples/instructions.yml') + chalk_1.default.gray(' for more rule ideas') + '\n' +
+        chalk_1.default.gray('2. Run ') + chalk_1.default.cyan.bold('instructor install --interactive') + chalk_1.default.gray(' to choose IDEs/agents') + '\n' +
         chalk_1.default.gray('3. Use ') + chalk_1.default.cyan.bold('instructor validate') + chalk_1.default.gray(' to check your setup'), {
         padding: 1,
         borderColor: 'green',
@@ -429,6 +488,106 @@ program
     }
     catch (error) {
         spinner.fail(chalk_1.default.red('Error cleaning files:') + ' ' + (error instanceof Error ? error.message : error));
+        process.exit(1);
+    }
+});
+// Reset command
+program
+    .command('reset')
+    .description('Reset project to clean state by removing all generated files and configurations')
+    .option('--confirm', 'Skip confirmation prompt')
+    .action(async (options) => {
+    console.log((0, boxen_1.default)(chalk_1.default.bold.red('🔄 Reset Project to Clean State'), {
+        padding: 1,
+        borderColor: 'red',
+        borderStyle: 'round',
+        margin: 1
+    }));
+    const filesToReset = [
+        'instructions.yml',
+        'CLAUDE.md',
+        'copilot-instructions.md',
+        '.vscode/settings.json',
+        'cursor/rules',
+        '.cursorrules'
+    ];
+    const existingFiles = filesToReset.filter(file => fs.existsSync(file));
+    if (existingFiles.length === 0) {
+        console.log(chalk_1.default.yellow('ℹ️  Project is already in clean state - no generated files found'));
+        return;
+    }
+    console.log('The following files and directories will be removed:');
+    existingFiles.forEach(file => {
+        console.log(chalk_1.default.red('   ✗'), file);
+    });
+    let shouldReset = options.confirm;
+    if (!shouldReset) {
+        const { confirm } = await inquirer_1.default.prompt([
+            {
+                type: 'confirm',
+                name: 'confirm',
+                message: 'Are you sure you want to reset the project? This will remove all configuration files.',
+                default: false
+            }
+        ]);
+        shouldReset = confirm;
+    }
+    if (!shouldReset) {
+        console.log(chalk_1.default.yellow('Reset cancelled'));
+        return;
+    }
+    const spinner = (0, ora_1.default)('Resetting project to clean state...').start();
+    try {
+        existingFiles.forEach(file => {
+            if (fs.existsSync(file)) {
+                if (fs.statSync(file).isDirectory()) {
+                    fs.rmSync(file, { recursive: true, force: true });
+                }
+                else {
+                    fs.unlinkSync(file);
+                }
+            }
+        });
+        // Also clean up .vscode directory if it's empty
+        if (fs.existsSync('.vscode')) {
+            const vscodeContents = fs.readdirSync('.vscode');
+            if (vscodeContents.length === 0) {
+                fs.rmdirSync('.vscode');
+            }
+        }
+        // Remove generated entries from .gitignore
+        const gitignorePath = './.gitignore';
+        if (fs.existsSync(gitignorePath)) {
+            let gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+            const linesToRemove = [
+                'cursor/rules/',
+                '# Generated by @launchmetrics/rules-package',
+                '# WARNING: Do not manually add generated files to git - they should remain gitignored'
+            ];
+            const lines = gitignoreContent.split('\n');
+            const filteredLines = lines.filter(line => !linesToRemove.some(remove => line.includes(remove)));
+            // Remove empty lines at the end
+            while (filteredLines.length > 0 && filteredLines[filteredLines.length - 1]?.trim() === '') {
+                filteredLines.pop();
+            }
+            if (filteredLines.length !== lines.length) {
+                fs.writeFileSync(gitignorePath, filteredLines.join('\n') + (filteredLines.length > 0 ? '\n' : ''));
+            }
+        }
+        spinner.succeed(chalk_1.default.green('Project reset to clean state successfully!'));
+        console.log((0, boxen_1.default)(chalk_1.default.green('✨ Clean slate!') + '\n\n' +
+            'Your project is now in a clean state.\n\n' +
+            chalk_1.default.gray('Next steps:') + '\n' +
+            chalk_1.default.gray('• Run ') + chalk_1.default.cyan.bold('instructor init') + chalk_1.default.gray(' to create a new configuration') + '\n' +
+            chalk_1.default.gray('• Run ') + chalk_1.default.cyan.bold('instructor install') + chalk_1.default.gray(' to generate config files'), {
+            padding: 1,
+            borderColor: 'green',
+            borderStyle: 'round',
+            margin: 1
+        }));
+    }
+    catch (error) {
+        spinner.fail(chalk_1.default.red('Error resetting project:') + ' ' + (error instanceof Error ? error.message : error));
         process.exit(1);
     }
 });

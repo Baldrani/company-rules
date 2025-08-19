@@ -1,4 +1,0 @@
-# use tailwind
-
-use tailwind
-

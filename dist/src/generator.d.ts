@@ -6,6 +6,8 @@ export interface PreviewItem {
     preview?: string;
 }
 export declare class FileGenerator {
+    private llmService;
+    constructor();
     generate(instructions: ParsedInstructions): Promise<void>;
     preview(instructions: ParsedInstructions): Promise<PreviewItem[]>;
     private generateIDEConfig;

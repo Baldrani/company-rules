@@ -52,9 +52,27 @@ npm install @launchmetrics/rules-package
    npx instructor preview --show-content
    ```
 
-## LLM Enhancement (Optional)
+## LLM Enhancement
 
-Set environment variables to enable AI-powered detailed rule generation:
+Enable AI-powered detailed rule generation that transforms basic rules into comprehensive guidelines with examples and best practices.
+
+### **Interactive Setup (Recommended)**
+
+The CLI will guide you through LLM setup:
+
+```bash
+npx instructor install --interactive
+
+# The CLI will ask:
+# ? Would you like to use AI-powered detailed rule generation? Yes
+# ? Which AI provider would you like to use? OpenAI (ChatGPT)
+# ? Would you like to enter your OpenAI API key now? Yes
+# ? Enter your OpenAI API key: ****************** (secure input)
+```
+
+### **Environment Variables (Alternative)**
+
+You can also pre-set environment variables:
 
 ```bash
 # Using OpenAI/ChatGPT
@@ -69,7 +87,21 @@ export ANTHROPIC_MODEL="claude-3-haiku-20240307"  # optional
 npx instructor install --interactive
 ```
 
-With LLM enhancement, basic rules like "use tailwind" become detailed, actionable guidelines with examples and best practices.
+### **What LLM Enhancement Does**
+
+**Basic rule:** `use tailwind`
+
+**LLM-enhanced output:**
+```markdown
+Use Tailwind CSS for all styling. Follow these guidelines:
+
+- Use Tailwind utility classes instead of custom CSS
+- Prefer semantic class combinations over arbitrary values
+- Use responsive prefixes (sm:, md:, lg:, xl:) for responsive design
+- Use state variants (hover:, focus:, active:) for interactive elements
+- Group related classes logically (layout, spacing, colors, typography)
+- Use Tailwind's color palette instead of custom hex values
+```
 
 ## CLI Commands
 
@@ -137,15 +169,23 @@ npx instructor status
 
 ### `instructor reset` / `instructor clean`
 
-Remove all generated configuration files (preserves instructions.yml).
+Remove all generated configuration files, directories, and .gitignore entries (preserves instructions.yml).
 
 ```bash
-# With confirmation prompt
+# With confirmation prompt (both commands work identically)
 npx instructor reset
+npx instructor clean
 
-# Skip confirmation (both commands work the same)
+# Skip confirmation 
+npx instructor reset --confirm
 npx instructor clean --confirm
 ```
+
+**What gets cleaned:**
+- All generated instruction files (`CLAUDE.md`, `copilot-instructions.md`, etc.)
+- Generated directories (`cursor/rules/`, `.vscode/` if empty)
+- Generated .gitignore entries
+- **Preserves:** `instructions.yml` (your rules are always safe)
 
 ## Configuration Reference
 
@@ -306,24 +346,10 @@ instructions:
 The generated files are created in the same directory as your `instructions.yml` file.
 
 ### With LLM Enhancement
-When you set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, basic rules are expanded into detailed, actionable guidelines:
-
-**Basic rule:** `use tailwind`
-
-**LLM-enhanced output:**
-```markdown
-Use Tailwind CSS for all styling. Follow these guidelines:
-
-- Use Tailwind utility classes instead of custom CSS
-- Prefer semantic class combinations over arbitrary values
-- Use responsive prefixes (sm:, md:, lg:, xl:) for responsive design
-- Use state variants (hover:, focus:, active:) for interactive elements
-- Group related classes logically (layout, spacing, colors, typography)
-- Use Tailwind's color palette instead of custom hex values
-```
+When you enable LLM enhancement (either through interactive setup or environment variables), basic rules are expanded into detailed, actionable guidelines tailored for each IDE and agent.
 
 ### Without LLM Enhancement
-Basic descriptions from your `instructions.yml` are used as-is.
+Basic descriptions from your `instructions.yml` are used as-is, providing simple but effective rule documentation.
 
 ### File Structure
 ```
@@ -461,8 +487,10 @@ node dist/src/cli.js preview --show-content
 - Check that the instructions.yml file exists and is valid
 
 **LLM enhancement not working**
+- Use interactive mode: `npx instructor install --interactive` (recommended)
 - Verify API key is set: `echo $OPENAI_API_KEY` or `echo $ANTHROPIC_API_KEY`
-- Check API key has sufficient credits/permissions
+- Check API key format (OpenAI: starts with `sk-`, Anthropic: starts with `sk-ant-`)
+- Verify API key has sufficient credits/permissions
 - Review error messages in verbose mode: `npx instructor install --interactive --verbose`
 
 ### Debug Mode
@@ -476,9 +504,12 @@ DEBUG=instructor npx instructor install --interactive
 ## Security
 
 - **Protected configuration**: `instructions.yml` is never modified by CLI commands
-- **Safe cleanup**: `reset`/`clean` commands preserve your rules file
-- **LLM privacy**: API calls only send rule names/descriptions, never your code
+- **Safe cleanup**: `reset`/`clean` commands preserve your rules file and clean up completely
+- **Secure API key entry**: Interactive mode uses masked password input
+- **Session-only keys**: API keys entered interactively are only stored for current session
+- **LLM privacy**: API calls only send rule names/descriptions, never your actual code
 - **No secrets in output**: Generated files contain only coding guidelines
+- **Complete .gitignore management**: All generated files automatically added/removed from .gitignore
 
 ## License
 
@@ -486,17 +517,74 @@ UNLICENSED - Private package for Launchmetrics internal use.
 
 ## Changelog
 
-### v1.1.0
+### v1.2.0 - Complete Architecture Overhaul
+**Major architectural changes and comprehensive feature additions**
+
+#### 🔧 **Core Architecture Changes**
+- **BREAKING**: Complete separation of concerns - `instructions.yml` now contains ONLY coding rules
+- **BREAKING**: IDE and agent selection moved to runtime (no longer stored in config)
+- **BREAKING**: Instructions.yml file is now completely protected from modification
+- Redesigned CLI flow to prompt for IDE/agent selection on every install
+
+#### 🤖 **LLM Integration & Enhancement**
+- Added full OpenAI API integration for rule enhancement
+- Added Anthropic (Claude) API integration for rule enhancement
+- Interactive LLM provider selection (OpenAI vs Anthropic)
+- Secure API key prompting with masked password input
+- Session-based API key storage (not persisted)
+- API key validation with provider-specific format checks
+- Fallback to basic rule generation when LLM unavailable
+- Enhanced rule expansion with platform-specific prompts
+
+#### 💡 **Interactive Experience**
+- New `--interactive` flag for all commands requiring user choices
+- Comprehensive selection prompts for IDEs, agents, and rules
+- Real-time API key setup during installation
+- Enhanced user experience with colored output and progress indicators
+- Smart defaults when not using interactive mode
+
+#### 📁 **File Management & Cleanup**
+- Comprehensive .gitignore management (automatic add/remove)
+- Complete cleanup system that removes files, directories, and gitignore entries
+- Protected instructions.yml from all modification operations
+- Smart directory cleanup (removes empty parent directories)
+- Enhanced `clean`/`reset` commands with confirmation prompts
+
+#### 🎯 **Expanded Platform Support**
+- **IDEs**: 9 supported (Cursor, VSCode, WebStorm, PhpStorm, IntelliJ, PyCharm, Sublime, Vim, Emacs)
+- **AI Agents**: 8 supported (Claude, Copilot, Codeium, Tabnine, ChatGPT, Gemini, Sourcegraph Cody, Amazon Q)
+- Dynamic file generation based on selected platforms
+- Platform-specific rule formatting and optimization
+
+#### 🛡️ **Security & Validation**
+- Secure API key input with masked characters
+- Session-only API key storage (never persisted to disk)
+- Enhanced validation with better error messages
+- Complete protection of source configuration files
+
+#### 📋 **Examples & Documentation**
+- Added comprehensive `examples/instructions.yml` with 20+ real-world rules
+- Updated all documentation to reflect new architecture
+- Enhanced CLI help and command descriptions
+- Improved error messages and user guidance
+
+#### 🔄 **Developer Experience**
+- Enhanced preview functionality showing exact file contents
+- Better status reporting with detailed configuration info
+- Improved validation with warnings and errors separation
+- Enhanced debugging with verbose mode support
+
+### v1.1.0 - Foundation Features
 - **BREAKING**: Separated rules from IDE/agent selection
-- Added LLM-powered rule enhancement (OpenAI/Anthropic)
+- Added LLM-powered rule enhancement (OpenAI/Anthropic) 
 - Expanded IDE support (9 IDEs) and agent support (8 agents)
 - Added `--interactive` mode for runtime selection
 - Protected instructions.yml from modification
 - Added comprehensive example with 20+ rules
 
-### v1.0.0
+### v1.0.0 - Initial Release
 - Initial release with Cursor, VSCode, Claude, and Copilot support
-- Preview functionality
+- Preview functionality  
 - Comprehensive validation
 - TypeScript strict mode
 - Interactive configuration setup
